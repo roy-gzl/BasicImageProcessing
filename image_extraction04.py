@@ -2,18 +2,15 @@ import os
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-from skimage.feature import hog
-from PIL import Image  # 追加（save_imageで使っているため）
+from PIL import Image
 
 
 def load_bgr(path: str) -> np.ndarray:
     if not os.path.exists(path):
         raise FileNotFoundError(f"画像が見つかりません: {path}")
     img = cv2.imread(path, cv2.IMREAD_COLOR)
-
     if img is None:
         raise ValueError(f"画像を読み込めませんでした: {path}")
-
     return img
 
 
@@ -60,13 +57,14 @@ def plot_gray_hist(hist, title):
     filename = title.replace(" ", "_") + ".jpg"
     plt.savefig(os.path.join("image/04", filename), dpi=300)
 
+
 def create_sift():
     if not hasattr(cv2, "SIFT_create"):
         raise RuntimeError("SIFT_create がありません（opencv-python を更新してください）")
     return cv2.SIFT_create()
 
 
-def sift_match(img1_bgr, img2_bgr):
+def sift_match(img1_bgr, img2_bgr, ratio: float = 0.75):
     sift = create_sift()
 
     g1 = cv2.cvtColor(img1_bgr, cv2.COLOR_BGR2GRAY)
@@ -78,9 +76,24 @@ def sift_match(img1_bgr, img2_bgr):
     if des1 is None or des2 is None:
         raise RuntimeError("SIFT特徴点が検出できませんでした")
 
-    matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
-    matches = matcher.match(des1, des2)
-    matches = sorted(matches, key=lambda m: m.distance)[:50]
+    # ratio test 用：crossCheck は使わない
+    matcher = cv2.BFMatcher(cv2.NORM_L2)
+    knn = matcher.knnMatch(des1, des2, k=2)
+
+    good = []
+    for pair in knn:
+        if len(pair) < 2:
+            continue
+        m, n = pair
+        if m.distance < ratio * n.distance:
+            good.append(m)
+
+    total_good = len(good)
+
+    # 表示は上位50
+    good = sorted(good, key=lambda m: m.distance)
+    shown = good[:50]
+    shown_m = len(shown)
 
     img1_kp = cv2.drawKeypoints(img1_bgr, kp1, None,
                                 flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
@@ -88,18 +101,11 @@ def sift_match(img1_bgr, img2_bgr):
                                 flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
     match_vis = cv2.drawMatches(
-        img1_bgr, kp1, img2_bgr, kp2, matches, None,
+        img1_bgr, kp1, img2_bgr, kp2, shown, None,
         flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
     )
 
-    return img1_kp, img2_kp, match_vis, len(kp1), len(kp2), len(matches)
-
-
-def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    a = a.astype(np.float32)
-    b = b.astype(np.float32)
-    return float(np.dot(a, b) /
-                 ((np.linalg.norm(a) * np.linalg.norm(b)) + 1e-12))
+    return img1_kp, img2_kp, match_vis, len(kp1), len(kp2), total_good, shown_m
 
 
 def save_image(img, title):
@@ -108,7 +114,6 @@ def save_image(img, title):
     filename = title.replace(" ", "_") + ".jpg"
     save_dir = os.path.join("image", "04")
     os.makedirs(save_dir, exist_ok=True)
-
     save_path = os.path.join(save_dir, filename)
 
     if isinstance(img, Image.Image):
@@ -131,79 +136,108 @@ def save_image(img, title):
             Image.fromarray(arr, mode="RGB").save(save_path, quality=95)
 
 
+def rotate_scale_center_crop(bgr: np.ndarray, angle_deg: float = 15.0, scale: float = 0.5) -> np.ndarray:
+    h, w = bgr.shape[:2]
+
+    pad = int(max(h, w) * 0.6)
+    H = h + 2 * pad
+    W = w + 2 * pad
+
+    canvas = np.zeros((H, W, 3), dtype=bgr.dtype)
+
+    top0 = 0
+    left0 = W - w
+    canvas[top0:top0 + h, left0:left0 + w] = bgr
+
+    cx = left0 + w / 2
+    cy = top0 + h / 2
+    M = cv2.getRotationMatrix2D((cx, cy), angle_deg, scale)
+
+    warped = cv2.warpAffine(canvas, M, (W, H), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT)
+
+    top = 0
+    left = W - w
+    out = warped[top:top + h, left:left + w].copy()
+
+    return out
+
+
+def run_sift_case(img1_bgr, img2_bgr, case_name: str):
+    img1_kp, img2_kp, match_vis, n1, n2, total_good, shown_m = sift_match(img1_bgr, img2_bgr)
+
+    plt.figure()
+    title = f"{case_name} - SIFT Keypoints Image 1 (n={n1})"
+    plt.title(title)
+    vis = cv2.cvtColor(img1_kp, cv2.COLOR_BGR2RGB)
+    plt.imshow(vis)
+    plt.axis("off")
+    save_image(vis, title)
+
+    plt.figure()
+    title = f"{case_name} - SIFT Keypoints Image 2 (n={n2})"
+    plt.title(title)
+    vis = cv2.cvtColor(img2_kp, cv2.COLOR_BGR2RGB)
+    plt.imshow(vis)
+    plt.axis("off")
+    save_image(vis, title)
+
+    plt.figure()
+    title = f"{case_name} - SIFT Matches (Good Matches: {total_good}, Displayed: {shown_m})"
+    plt.title(title)
+    vis = cv2.cvtColor(match_vis, cv2.COLOR_BGR2RGB)
+    plt.imshow(vis)
+    plt.axis("off")
+    save_image(vis, title)
+
+    print(f"[{case_name}] SIFT keypoints: img1={n1}, img2={n2}, good_matches={total_good}, shown={shown_m}")
+
+
 def main():
     path1 = "0.jpg"
     path2 = "1.jpg"
 
-    img1 = load_bgr(path1)
-    img2 = load_bgr(path2)
+    img0 = load_bgr(path1)
+    img1 = load_bgr(path2)
 
+    # --- 画像表示＆保存（元の2枚だけ） ---
+    img0_rgb = cv2.cvtColor(img0, cv2.COLOR_BGR2RGB)
     img1_rgb = cv2.cvtColor(img1, cv2.COLOR_BGR2RGB)
-    img2_rgb = cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
 
-    # 画像表示
     plt.figure()
     title = "Image 1"
+    plt.title(title)
+    plt.imshow(img0_rgb)
+    plt.axis("off")
+    save_image(img0_rgb, title)
+
+    plt.figure()
+    title = "Image 2"
     plt.title(title)
     plt.imshow(img1_rgb)
     plt.axis("off")
     save_image(img1_rgb, title)
 
-    plt.figure()
-    title = "Image 2"
-    plt.title(title)
-    plt.imshow(img2_rgb)
-    plt.axis("off")
-    save_image(img2_rgb, title)
+    # --- ヒストグラム（元の2枚だけ） ---
+    plot_color_hist(color_hist_bgr(img0), "Color Histogram (Image 1)")
+    plot_color_hist(color_hist_bgr(img1), "Color Histogram (Image 2)")
 
-    # ヒストグラム
-    h1 = color_hist_bgr(img1)
-    h2 = color_hist_bgr(img2)
-
-    plot_color_hist(h1, "Color Histogram (Image 1)")
-    plot_color_hist(h2, "Color Histogram (Image 2)")
-
+    g0 = cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY)
     g1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-    g2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
-    gh1 = gray_hist(g1)
-    gh2 = gray_hist(g2)
+    plot_gray_hist(gray_hist(g0), "Gray Histogram (Image 1)")
+    plot_gray_hist(gray_hist(g1), "Gray Histogram (Image 2)")
 
-    plot_gray_hist(gh1, "Gray Histogram (Image 1)")
-    plot_gray_hist(gh2, "Gray Histogram (Image 2)")
-
-    # SIFT
+    # --- SIFTだけ自動で2ケース ---
     try:
-        img1_kp, img2_kp, match_vis, n1, n2, nm = sift_match(img1, img2)
-
-        plt.figure()
-        title = f"SIFT Keypoints Image 1 (n={n1})"
-        plt.title(title)
-        vis = cv2.cvtColor(img1_kp, cv2.COLOR_BGR2RGB)
-        plt.imshow(vis)
-        plt.axis("off")
-        save_image(vis, title)
-
-        plt.figure()
-        title = f"SIFT Keypoints Image 2 (n={n2})"
-        plt.title(title)
-        vis = cv2.cvtColor(img2_kp, cv2.COLOR_BGR2RGB)
-        plt.imshow(vis)
-        plt.axis("off")
-        save_image(vis, title)
-
-        plt.figure()
-        title = f"SIFT Matches (top {nm})"
-        plt.title(title)
-        vis = cv2.cvtColor(match_vis, cv2.COLOR_BGR2RGB)
-        plt.imshow(vis)
-        plt.axis("off")
-        save_image(vis, title)
-
-        print(f"SIFT keypoints: img1={n1}, img2={n2}, matches={nm}")
-
+        run_sift_case(img0, img1, "CaseA_DifferentImages")
     except Exception as e:
-        print("SIFT 実行エラー:", e)
+        print("CaseA エラー:", e)
+
+    try:
+        img0_trans = rotate_scale_center_crop(img0, angle_deg=15.0, scale=0.5)
+        run_sift_case(img0, img0_trans, "CaseB_RotateScaleCrop")
+    except Exception as e:
+        print("CaseB エラー:", e)
 
     plt.show()
 
