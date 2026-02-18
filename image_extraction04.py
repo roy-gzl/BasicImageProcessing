@@ -45,13 +45,20 @@ def plot_color_hist(hists, title):
     plt.xlim([0, 255])
     plt.legend()
 
+    os.makedirs("image/04", exist_ok=True)
+    filename = title.replace(" ", "_") + ".jpg"
+    plt.savefig(os.path.join("image/04", filename), dpi=300)
+
 
 def plot_gray_hist(hist, title):
     plt.figure()
     plt.title(title)
-    plt.plot(hist)
+    plt.plot(hist, color="black")
     plt.xlim([0, 255])
 
+    os.makedirs("image/04", exist_ok=True)
+    filename = title.replace(" ", "_") + ".jpg"
+    plt.savefig(os.path.join("image/04", filename), dpi=300)
 
 def create_sift():
     if not hasattr(cv2, "SIFT_create"):
@@ -152,19 +159,18 @@ def main():
     # ヒストグラム
     h1 = color_hist_bgr(img1)
     h2 = color_hist_bgr(img2)
-    title1 = "Color Histogram (Image 1)"
-    title2 = "Color Histogram (Image 2)"
-    plot_color_hist(h1, title1)
-    plot_color_hist(h2, title2)
+
+    plot_color_hist(h1, "Color Histogram (Image 1)")
+    plot_color_hist(h2, "Color Histogram (Image 2)")
 
     g1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
     g2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
     gh1 = gray_hist(g1)
     gh2 = gray_hist(g2)
-    title1 = "Gray Histogram (Image 1)"
-    title2 = "Gray Histogram (Image 2)"
-    plot_gray_hist(gh1, title1)
-    plot_gray_hist(gh2, title2)
+
+    plot_gray_hist(gh1, "Gray Histogram (Image 1)")
+    plot_gray_hist(gh2, "Gray Histogram (Image 2)")
 
     # SIFT
     try:
