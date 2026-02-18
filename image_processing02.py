@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import matplotlib.pyplot as plt
 
 
@@ -21,6 +21,31 @@ def to_grayscale_np(img: Image.Image) -> np.ndarray:
 
 def binarize(gray: np.ndarray, threshold: int = 128) -> np.ndarray:
     return np.where(gray >= threshold, 255, 0).astype(np.uint8)
+
+
+def annotate_size(img: Image.Image, label: str) -> Image.Image:
+    """画像にラベルとピクセル寸法を焼き込む（第三者向け証拠）"""
+    out = img.copy().convert("RGB")
+    draw = ImageDraw.Draw(out)
+
+    w, h = out.size
+    text = f"{label}  |  {w} x {h} px"
+
+    # フォント（環境により無いので安全にフォールバック）
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 24)
+    except:
+        font = ImageFont.load_default()
+
+    # 文字の背景（半透明風に黒の矩形）
+    pad = 8
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
+    x, y = 10, 10
+    draw.rectangle([x-pad, y-pad, x+tw+pad, y+th+pad], fill=(0, 0, 0))
+    draw.text((x, y), text, fill=(255, 255, 255), font=font)
+
+    return out
 
 
 def save_image(img, title):

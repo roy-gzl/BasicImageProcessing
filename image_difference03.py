@@ -57,7 +57,7 @@ def save_image(img, title):
 def main():
     img1 = load_image("0.jpg")
     img2 = img1.rotate(2, expand=False) 
-    img3 = zoom_and_crop_center(img1, scale=1.01)
+    img3 = zoom_and_crop_center(img1, scale=1.02)
 
     arr1 = np.array(img1, dtype=np.int16)
     arr2 = np.array(img2, dtype=np.int16)
