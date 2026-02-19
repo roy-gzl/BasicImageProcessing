@@ -235,6 +235,16 @@ def main():
 
     try:
         img0_trans = rotate_scale_center_crop(img0, angle_deg=15.0, scale=0.5)
+
+        # ★ 追加：変換後画像も保存
+        img0_trans_rgb = cv2.cvtColor(img0_trans, cv2.COLOR_BGR2RGB)
+        plt.figure()
+        title = "Image 1 (Rotate+Scale+Crop)"
+        plt.title(title)
+        plt.imshow(img0_trans_rgb)
+        plt.axis("off")
+        save_image(img0_trans_rgb, title)
+
         run_sift_case(img0, img0_trans, "CaseB_RotateScaleCrop")
     except Exception as e:
         print("CaseB エラー:", e)
