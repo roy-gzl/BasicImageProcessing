@@ -31,13 +31,11 @@ def annotate_size(img: Image.Image, label: str) -> Image.Image:
     w, h = out.size
     text = f"{label}  |  {w} x {h} px"
 
-    # フォント（環境により無いので安全にフォールバック）
     try:
         font = ImageFont.truetype("DejaVuSans.ttf", 24)
     except:
         font = ImageFont.load_default()
 
-    # 文字の背景（半透明風に黒の矩形）
     pad = 8
     bbox = draw.textbbox((0, 0), text, font=font)
     tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
@@ -82,7 +80,6 @@ def main():
 
     img = load_or_make_sample(image_path)
 
-    #表示
     plt.figure()
     title = "Original"
     plt.title(title)
@@ -90,7 +87,6 @@ def main():
     plt.axis("off")
     save_image(img, title)
 
-    #縮小拡大
     scale_up = img.resize((img.width * 2, img.height * 2), resample=Image.BICUBIC)
     scale_down = img.resize((img.width // 2, img.height // 2), resample=Image.BICUBIC)
 
@@ -108,7 +104,6 @@ def main():
     plt.axis("off")
     save_image(scale_down, title)
 
-    #回転
     rotated_30 = img.rotate(30, resample=Image.BICUBIC, expand=True)
 
     plt.figure()
@@ -118,7 +113,6 @@ def main():
     plt.axis("off")
     save_image(rotated_30, title)
 
-    #二値化
     gray = to_grayscale_np(img)
     binary = binarize(gray, threshold=128)
 

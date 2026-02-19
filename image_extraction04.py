@@ -76,7 +76,6 @@ def sift_match(img1_bgr, img2_bgr, ratio: float = 0.75):
     if des1 is None or des2 is None:
         raise RuntimeError("SIFT特徴点が検出できませんでした")
 
-    # ratio test 用：crossCheck は使わない
     matcher = cv2.BFMatcher(cv2.NORM_L2)
     knn = matcher.knnMatch(des1, des2, k=2)
 
@@ -90,7 +89,6 @@ def sift_match(img1_bgr, img2_bgr, ratio: float = 0.75):
 
     total_good = len(good)
 
-    # 表示は上位50
     good = sorted(good, key=lambda m: m.distance)
     shown = good[:50]
     shown_m = len(shown)
@@ -199,7 +197,6 @@ def main():
     img0 = load_bgr(path1)
     img1 = load_bgr(path2)
 
-    # --- 画像表示＆保存（元の2枚だけ） ---
     img0_rgb = cv2.cvtColor(img0, cv2.COLOR_BGR2RGB)
     img1_rgb = cv2.cvtColor(img1, cv2.COLOR_BGR2RGB)
 
@@ -217,7 +214,6 @@ def main():
     plt.axis("off")
     save_image(img1_rgb, title)
 
-    # --- ヒストグラム（元の2枚だけ） ---
     plot_color_hist(color_hist_bgr(img0), "Color Histogram (Image 1)")
     plot_color_hist(color_hist_bgr(img1), "Color Histogram (Image 2)")
 
@@ -227,7 +223,6 @@ def main():
     plot_gray_hist(gray_hist(g0), "Gray Histogram (Image 1)")
     plot_gray_hist(gray_hist(g1), "Gray Histogram (Image 2)")
 
-    # --- SIFTだけ自動で2ケース ---
     try:
         run_sift_case(img0, img1, "CaseA_DifferentImages")
     except Exception as e:
@@ -236,7 +231,6 @@ def main():
     try:
         img0_trans = rotate_scale_center_crop(img0, angle_deg=15.0, scale=0.5)
 
-        # ★ 追加：変換後画像も保存
         img0_trans_rgb = cv2.cvtColor(img0_trans, cv2.COLOR_BGR2RGB)
         plt.figure()
         title = "Image 1 (Rotate+Scale+Crop)"
